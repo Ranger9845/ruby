@@ -1,8 +1,12 @@
 // Vercel serverless function: POST /api/chat
-// Order: 1) Wikipedia (free, no key, no LLM) for "what is / who is /
-// tell me about X" questions, 2) Gemini when GEMINI_API_KEY is set,
-// 3) otherwise an error and the chat page falls back to Ruby's local
+// Order: 1) Wikidata (free, no key, no LLM) for "what is / who is /
+// tell me about X" questions, 2) Wikipedia (free, no key, no LLM),
+// 3) Gemini when GEMINI_API_KEY is set,
+// 4) otherwise an error and the chat page falls back to Ruby's local
 // brain in the browser — the live site never breaks for lack of a key.
+// This is how Wikidata "trains" Ruby: she looks up facts in it at
+// answer time, instead of generating them with an LLM, and if a fact
+// is not in Wikidata / Wikipedia / her own base, she says so.
 //
 // Set the key in Vercel (Project Settings > Environment Variables), never
 // in this file, never in the repo, and never in chat. Use a fresh key:
@@ -36,7 +40,27 @@ module.exports = async function handler(req, res) {
     res.status(400).json({ error: 'Missing message.' });
     return;
   }
-  // Free database first: Wikipedia's summary API needs no key.
+  // Free database first: Wikidata, no key, no LLM.
+  const wdMatch = message.trim().match(/^(what is|who is|tell me about|what'?s)\s+(.+?)\??$/i);
+  if (wdMatch) {
+    try {
+      const search = encodeURIComponent(wdMatch[2].trim());
+      const wdRes = await fetch('https://www.wikidata.org/w/api.php?action=wbsearchentities&search=' + search + '&language=en&format=json&origin=*', {
+        headers: { 'User-Agent': 'RubyChatbot/1.0' },
+        signal: AbortSignal.timeout(15000),
+      });
+      if (wdRes.ok) {
+        const wd = await wdRes.json();
+        const hit = wd && wd.search && wd.search[0];
+        if (hit && hit.description) {
+          res.status(200).json({ answer: hit.label + ': ' + hit.description + ' (Source: Wikidata, ' + hit.id + ')', mode: 'wikidata' });
+          return;
+        }
+      }
+    } catch (e) { /* fall through to Wikipedia */ }
+  }
+
+  // Free database second: Wikipedia's summary API needs no key.
   const wikiMatch = message.trim().match(/^(what is|who is|tell me about|what'?s)\s+(.+?)\??$/i);
   if (wikiMatch) {
     try {

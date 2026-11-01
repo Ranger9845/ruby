@@ -109,7 +109,9 @@
         bubble('ruby', answer);
         history.push({ role: 'ruby', text: answer });
         status.textContent = server
-          ? (server.mode === 'wikipedia' ? 'Answered from Wikipedia (free, no LLM)' : 'Answered by Gemini')
+          ? (server.mode === 'wikipedia' ? 'Answered from Wikipedia (free, no LLM)'
+            : server.mode === 'wikidata' ? 'Answered from Wikidata (free, no LLM)'
+            : 'Answered by Gemini')
           : (brain.memory.name ? 'Chatting with ' + brain.memory.name + ' (local brain)' : 'Memory saved in this browser (local brain)');
         persist();
       });
