@@ -75,6 +75,9 @@
       preferences: {},
       notes: [],
       todos: [],
+      shopping: [],
+      reminders: [],
+      routines: [],
       customReplies: {},
       jokeIndex: 0,
       pendingQuestion: null,
@@ -87,6 +90,9 @@
     mem.facts = mem.facts || [];
     mem.notes = mem.notes || [];
     mem.todos = mem.todos || [];
+    mem.shopping = mem.shopping || [];
+    mem.reminders = mem.reminders || [];
+    mem.routines = mem.routines || [];
     mem.preferences = mem.preferences || {};
     mem.customReplies = mem.customReplies || {};
     if (typeof mem.jokeIndex !== 'number') mem.jokeIndex = 0;
@@ -141,13 +147,18 @@
       mem.pendingQuestion = null;
 
       if (/^(help|what can you do|commands|what do you do)$/.test(text)) {
-        return 'I can chat, remember things, and help with small tasks. Try:\n' +
+        return 'I can chat, remember things, and help with small tasks — no LLM needed for these. Try:\n' +
           '• “my name is Logan” / “remember that I like blue”\n' +
           '• “what do you remember about me?”\n' +
           '• “add buy milk to my todos” / “list my todos” / “done with buy milk”\n' +
+          '• “add milk to my shopping list” / “shopping list”\n' +
+          '• “remind me at 4pm to call the shop” / “my reminders”\n' +
+          '• “add brush teeth to my morning routine” / “morning routine” / “good morning”\n' +
+          '• “draft a call to the shop about milk” — I draft it with my AI disclosure, I do not dial it myself\n' +
           '• “note that the shop closes at 9” / “list my notes”\n' +
-          '• “what is 12 * 8 + 5?” / “what time is it?” / “tell me a joke”\n' +
-          '• “when I say good morning, say …” to teach me a reply';
+          '• “what is 12 * 8 + 5?” / “convert 5 miles to km” / “convert 70 f to c” / “what time is it?” / “tell me a joke”\n' +
+          '• “when I say good morning, say …” to teach me a reply\n' +
+          '• I cannot check live weather, news, or prices in local mode, and I will not guess at them.';
       }
 
       if (/are you (a )?human|are you real|are you a person/.test(text)) {
@@ -249,6 +260,88 @@
       if (/^(list|show) my notes|my notes/.test(text)) {
         if (!mem.notes.length) return 'No notes yet. Try “note that the shop closes at 9”.';
         return 'Your notes:\n' + mem.notes.map(function (n, idx) { return (idx + 1) + '. ' + n; }).join('\n');
+      }
+
+      // Shopping list — everyday task, no LLM needed.
+      var addShop = text.match(/^add (.+?) to my shopping list$/);
+      if (addShop) {
+        mem.shopping.push(clean(addShop[1]));
+        return 'Added to your shopping list: ' + clean(addShop[1]) + '.';
+      }
+      if (/^(list|show) my shopping list|shopping list|what'?s on my shopping list/.test(text)) {
+        if (!mem.shopping.length) return 'Your shopping list is empty. Try “add milk to my shopping list”.';
+        return 'Your shopping list:\n' + mem.shopping.map(function (s, idx) { return (idx + 1) + '. ' + s; }).join('\n');
+      }
+      var delShop = text.match(/^remove (.+?) from my shopping list$/);
+      if (delShop) {
+        var sTarget = clean(delShop[1]);
+        var sBefore = mem.shopping.length;
+        mem.shopping = mem.shopping.filter(function (s) { return s.toLowerCase() !== sTarget; });
+        return mem.shopping.length < sBefore ? 'Removed from your shopping list: ' + sTarget + '.' : 'That is not on your shopping list.';
+      }
+      if (/^clear my shopping list/.test(text)) {
+        mem.shopping = [];
+        return 'Shopping list cleared.';
+      }
+
+      // Reminders — saved here. Honest limit: this page cannot buzz you
+      // when it is closed, so these are a list to check, not alarms.
+      var rem = text.match(/^remind me (at|on) (.+?) to (.+)$/);
+      if (rem) {
+        mem.reminders.push({ when: clean(rem[2]), text: clean(rem[3]) });
+        return 'Reminder saved for ' + clean(rem[2]) + ': ' + clean(rem[3]) + '. (I can list it here, but I cannot alarm you if this page is closed.)';
+      }
+      if (/^(list|show) my reminders|my reminders/.test(text)) {
+        if (!mem.reminders.length) return 'No reminders saved. Try “remind me at 4pm to call the shop”.';
+        return 'Your reminders:\n' + mem.reminders.map(function (r, idx) { return (idx + 1) + '. ' + r.when + ' — ' + r.text; }).join('\n');
+      }
+
+      // Morning routine / daily check-in
+      var addRoutine = text.match(/^add (.+?) to my (morning|daily|evening) routine$/);
+      if (addRoutine) {
+        mem.routines.push({ when: addRoutine[2], text: clean(addRoutine[1]) });
+        return 'Added to your ' + addRoutine[2] + ' routine: ' + clean(addRoutine[1]) + '.';
+      }
+      if (/^(morning|daily|evening) routine|my routine/.test(text)) {
+        if (!mem.routines.length) return 'No routine saved yet. Try “add brush teeth to my morning routine”.';
+        return 'Your routine:\n' + mem.routines.map(function (r, idx) { return (idx + 1) + '. [' + r.when + '] ' + r.text; }).join('\n');
+      }
+      if (/^good morning$/.test(text)) {
+        var gm = ['Good morning' + (mem.name ? ', ' + mem.name : '') + '! Here is what I have for you:'];
+        gm.push(mem.todos.length ? 'Todos: ' + mem.todos.filter(function (t) { return !t.done; }).map(function (t) { return t.text; }).join(', ') : 'No open todos.');
+        gm.push(mem.reminders.length ? 'Reminders: ' + mem.reminders.map(function (r) { return r.when + ' — ' + r.text; }).join(', ') : 'No reminders saved.');
+        gm.push(mem.routines.length ? 'Routine: ' + mem.routines.map(function (r) { return r.text; }).join(', ') : 'No routine saved yet — try “add brush teeth to my morning routine”.');
+        return gm.join('\n');
+      }
+
+      // Call draft — Ruby does NOT dial. She drafts a script with her AI
+      // disclosure forced, for the person running her to approve and use.
+      var draftCall = text.match(/^draft a call to (.+?) about (.+)$/);
+      if (draftCall) {
+        var who = mem.name || 'Logan';
+        return 'Here is a call script I can use — I will not dial it myself, you approve it first:\n' +
+          '"Hi, I\'m Ruby, an AI assistant calling on behalf of ' + who + '. ' +
+          'I have a question about ' + clean(draftCall[2]) + ', if you\'re available!"\n' +
+          'To: ' + clean(draftCall[1]) + '. I always say I am an AI assistant, and I never claim to be human.';
+      }
+
+      // Simple conversions — no LLM needed.
+      var conv = text.match(/^convert ([0-9.]+) (miles?|km|kilometers?|f|fahrenheit|c|celsius) to (miles?|km|kilometers?|f|fahrenheit|c|celsius)$/);
+      if (conv) {
+        var v = parseFloat(conv[1]);
+        var from = conv[2], to = conv[3];
+        if ((from === 'f' || from === 'fahrenheit') && (to === 'c' || to === 'celsius')) return v + '°F = ' + ((v - 32) * 5 / 9).toFixed(1) + '°C';
+        if ((from === 'c' || from === 'celsius') && (to === 'f' || to === 'fahrenheit')) return v + '°C = ' + (v * 9 / 5 + 32).toFixed(1) + '°F';
+        if ((from === 'miles' || from === 'mile') && (to === 'km' || to === 'kilometers' || to === 'kilometer')) return v + ' miles = ' + (v * 1.60934).toFixed(2) + ' km';
+        if ((to === 'miles' || to === 'mile') && (from === 'km' || from === 'kilometers' || from === 'kilometer')) return v + ' km = ' + (v / 1.60934).toFixed(2) + ' miles';
+        return 'I can convert miles <-> km and Fahrenheit <-> Celsius in local mode.';
+      }
+
+      // Teach a question/answer pair (alias for "when I say …, say …").
+      var teachQ = text.match(/^when i ask (.+?), answer (.+)$/);
+      if (teachQ) {
+        mem.customReplies[clean(teachQ[1])] = clean(teachQ[2]);
+        return 'Got it. When you ask “' + clean(teachQ[1]) + '”, I will answer “' + clean(teachQ[2]) + '”.';
       }
 
       // Calculator
