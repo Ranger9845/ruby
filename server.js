@@ -6,8 +6,10 @@
 // paste it in chat; pass it as an environment variable when you start Ruby):
 //   OPENAI_API_KEY  — OpenAI, paid, model via OPENAI_MODEL (default gpt-4o-mini)
 //   GEMINI_API_KEY  — Google AI Studio, free tier, model via GEMINI_MODEL
-//                     (default gemini-3.8-flash — check AI Studio for the
-//                     current free-tier model names, they change)
+//                     (default gemini-3.5-flash-lite, verified working
+//                     2026-11-01 in ~1.5s. Do NOT use gemini-3.8-flash here:
+//                     it hung past 30s in that test, and gemini-2.5-flash /
+//                     -lite now return 404 "no longer available to new users".)
 //   GROQ_API_KEY    — Groq, free tier, model via GROQ_MODEL
 //                     (default openai/gpt-oss-120b)
 // Free-tier note: on Google's free tier, prompts may be used to improve
@@ -61,6 +63,7 @@ async function openAiCompatibleReply(url, key, model, messages) {
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + key },
+    signal: AbortSignal.timeout(30000),
     body: JSON.stringify({
       model,
       messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages.slice(-20)],
@@ -77,11 +80,15 @@ async function geminiReply(key, model, messages) {
     role: m.role === 'assistant' ? 'model' : 'user',
     parts: [{ text: m.content }],
   }));
+  // Header, not a ?key= URL, so the key never lands in a URL / log line.
+  // 30s timeout: without this, a slow model hangs Ruby forever instead
+  // of falling back to her local brain.
   const res = await fetch(
-    'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(key),
+    'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent',
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+      signal: AbortSignal.timeout(30000),
       body: JSON.stringify({
         system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
         contents,
@@ -109,7 +116,7 @@ async function llmReply(messages) {
   if (process.env.GEMINI_API_KEY) {
     providers.push(['gemini', () => geminiReply(
       process.env.GEMINI_API_KEY,
-      process.env.GEMINI_MODEL || 'gemini-3.8-flash', messages)]);
+      process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite', messages)]);
   }
   if (process.env.GROQ_API_KEY) {
     providers.push(['groq', () => openAiCompatibleReply(

@@ -54,6 +54,27 @@
     }
   }
 
+  // Try the server's /api/chat first (Gemini on Vercel, or the local
+  // Node server). Any failure — no server, no key, timeout — falls back
+  // to Ruby's local brain in this browser, so chat never breaks.
+  async function serverAnswer(text) {
+    try {
+      var controller = new AbortController();
+      var timer = setTimeout(function () { controller.abort(); }, 30000);
+      var res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, history: history.slice(-10) }),
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (!res.ok) return null;
+      var data = await res.json();
+      if (data && data.answer && data.mode && data.mode.indexOf('llm:') === 0) return data.answer;
+      return null;
+    } catch (e) { return null; }
+  }
+
   function send(text) {
     text = (text || '').trim();
     if (!text) return;
@@ -64,19 +85,29 @@
     typing.classList.add('typing');
     status.textContent = 'Ruby is thinking…';
 
+    // Small delay so the typing indicator is visible, then answer.
     setTimeout(function () {
-      typing.remove();
-      var answer;
-      try {
-        answer = brain.reply(text, { history: history.slice(-10) });
-      } catch (e) {
-        answer = 'Something tripped me up on that one — try rephrasing it, or type “help”.';
-      }
-      bubble('ruby', answer);
-      history.push({ role: 'ruby', text: answer });
-      status.textContent = brain.memory.name ? 'Chatting with ' + brain.memory.name : 'Memory saved in this browser';
-      persist();
-    }, 350);
+      serverAnswer(text).then(function (llmAnswer) {
+        typing.remove();
+        var answer;
+        var viaLlm = !!llmAnswer;
+        if (viaLlm) {
+          answer = llmAnswer;
+        } else {
+          try {
+            answer = brain.reply(text, { history: history.slice(-10) });
+          } catch (e) {
+            answer = 'Something tripped me up on that one — try rephrasing it, or type “help”.';
+          }
+        }
+        bubble('ruby', answer);
+        history.push({ role: 'ruby', text: answer });
+        status.textContent = viaLlm
+          ? 'Answered by Gemini'
+          : (brain.memory.name ? 'Chatting with ' + brain.memory.name + ' (local brain)' : 'Memory saved in this browser (local brain)');
+        persist();
+      });
+    }, 200);
   }
 
   form.addEventListener('submit', function (e) {
