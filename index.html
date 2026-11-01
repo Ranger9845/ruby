@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ruby — AI Chatbot</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <div class="gem" aria-hidden="true">◆</div>
+    <div>
+      <h1>Ruby</h1>
+      <p>An AI chatbot — warm, direct, and a little playful. She is not a human.</p>
+    </div>
+  </header>
+
+  <p id="status">Memory saved in this browser</p>
+  <div id="log" aria-live="polite"></div>
+
+  <form id="chat-form">
+    <input id="input" type="text" autocomplete="off" placeholder="Talk to Ruby…" aria-label="Message Ruby">
+    <button type="submit">Send</button>
+  </form>
+
+  <div class="chips">
+    <button type="button" data-say="help">help</button>
+    <button type="button" data-say="my name is Logan">my name is Logan</button>
+    <button type="button" data-say="add buy milk to my todos">add a todo</button>
+    <button type="button" data-say="what is 12 * 8 + 5?">calculate something</button>
+    <button type="button" data-say="tell me a joke">tell me a joke</button>
+    <button type="button" data-say="what do you remember about me?">what do you remember?</button>
+  </div>
+
+  <div class="tools">
+    <button type="button" id="export-btn">Export chat + memory</button>
+    <button type="button" id="clear-btn">Clear chat + memory</button>
+  </div>
+
+  <p class="honest">
+    Ruby runs in local mode in this page: she remembers facts, notes, and todos in this browser,
+    but she cannot check live weather or news and she is not a real large language model.
+    Run <code>node server.js</code> with an <code>OPENAI_API_KEY</code> set to give her a real LLM backend —
+    see <a href="README.md">README.md</a>. She always identifies herself as an AI.
+  </p>
+</main>
+<script src="brain.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

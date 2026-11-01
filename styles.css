@@ -1,0 +1,25 @@
+:root { --ruby: #c2183a; --ruby-dark: #8f0f2a; --bg: #fff5f7; --ink: #241318; --muted: #7a5a62; --card: #ffffff; --line: #f0d3da; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg); color: var(--ink); }
+.wrap { max-width: 760px; margin: 0 auto; padding: 20px 16px 32px; }
+header { display: flex; gap: 14px; align-items: center; margin-bottom: 12px; }
+.gem { width: 56px; height: 56px; border-radius: 16px; background: linear-gradient(135deg, #e91e4d, var(--ruby-dark)); display: grid; place-items: center; font-size: 28px; box-shadow: 0 8px 20px rgba(194,24,58,.3); }
+header h1 { margin: 0; font-size: 28px; }
+header p { margin: 4px 0 0; color: var(--muted); }
+#status { font-size: 13px; color: var(--muted); margin: 0 0 10px; }
+#log { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; height: 52vh; min-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+.msg { max-width: 85%; padding: 10px 12px; border-radius: 14px; line-height: 1.45; white-space: pre-wrap; }
+.msg.ruby { background: #fdeef1; border: 1px solid var(--line); align-self: flex-start; }
+.msg.user { background: var(--ruby); color: #fff; align-self: flex-end; }
+.msg.typing { opacity: .7; }
+.who { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; opacity: .65; margin-bottom: 2px; }
+form { display: flex; gap: 8px; margin-top: 12px; }
+#input { flex: 1; padding: 12px 14px; border: 1px solid var(--line); border-radius: 999px; font-size: 16px; }
+button { cursor: pointer; border: 0; border-radius: 999px; padding: 12px 18px; font-size: 15px; font-weight: 600; }
+button[type="submit"] { background: var(--ruby); color: #fff; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.chips button { background: #fff; border: 1px solid var(--line); color: var(--ruby-dark); padding: 8px 12px; font-size: 14px; }
+.tools { display: flex; gap: 8px; margin-top: 12px; }
+.tools button { background: transparent; border: 1px solid var(--line); color: var(--muted); padding: 8px 12px; font-size: 13px; }
+.honest { font-size: 13px; color: var(--muted); line-height: 1.5; margin-top: 14px; }
+a { color: var(--ruby-dark); }
