@@ -167,13 +167,17 @@ const server = http.createServer(async (req, res) => {
       req.on('end', async () => {
         try {
           const { message, history } = JSON.parse(body || '{}');
-          let answer = null;
+          // Ruby's own brain first. Only if it falls back to its generic
+          // "I hear you" reply do we try an LLM — so she is her own
+          // for everything she already knows, and an LLM is a last resort.
+          let answer = brain.reply(message, { history: history || [] });
           let mode = 'local';
-          try {
-            const llm = await llmReply([...(history || []), { role: 'user', text: message }].map((m) => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text })));
-            if (llm && llm.answer) { answer = llm.answer; mode = 'llm:' + llm.provider; }
-          } catch (e) { /* fall through to local brain */ }
-          if (!answer) answer = brain.reply(message, { history: history || [] });
+          if (answer && answer.indexOf('I hear you') === 0) {
+            try {
+              const llm = await llmReply([...(history || []), { role: 'user', text: message }].map((m) => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text })));
+              if (llm && llm.answer) { answer = llm.answer; mode = 'llm:' + llm.provider; }
+            } catch (e) { /* keep the local brain answer */ }
+          }
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ answer, mode }));
         } catch (e) {

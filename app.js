@@ -54,9 +54,9 @@
     }
   }
 
-  // Try the server's /api/chat first (Gemini on Vercel, or the local
-  // Node server). Any failure — no server, no key, timeout — falls back
-  // to Ruby's local brain in this browser, so chat never breaks.
+  // Ruby's own brain first, in this browser. Only if it falls back to
+  // its generic "I hear you" reply do we try the server (Wikipedia on
+  // Vercel, then Gemini) — so she is her own for everything she knows.
   async function serverAnswer(text) {
     try {
       var controller = new AbortController();
@@ -70,7 +70,7 @@
       clearTimeout(timer);
       if (!res.ok) return null;
       var data = await res.json();
-      if (data && data.answer && data.mode && data.mode.indexOf('llm:') === 0) return data.answer;
+      if (data && data.answer && data.mode) return { answer: data.answer, mode: data.mode };
       return null;
     } catch (e) { return null; }
   }
@@ -87,23 +87,29 @@
 
     // Small delay so the typing indicator is visible, then answer.
     setTimeout(function () {
-      serverAnswer(text).then(function (llmAnswer) {
+      var localAnswer;
+      try {
+        localAnswer = brain.reply(text, { history: history.slice(-10) });
+      } catch (e) {
+        localAnswer = 'Something tripped me up on that one — try rephrasing it, or type “help”.';
+      }
+      // If Ruby's own brain handled it, use that. Only her generic
+      // fallback goes to the server (Wikipedia, then Gemini).
+      if (localAnswer.indexOf('I hear you') !== 0) {
         typing.remove();
-        var answer;
-        var viaLlm = !!llmAnswer;
-        if (viaLlm) {
-          answer = llmAnswer;
-        } else {
-          try {
-            answer = brain.reply(text, { history: history.slice(-10) });
-          } catch (e) {
-            answer = 'Something tripped me up on that one — try rephrasing it, or type “help”.';
-          }
-        }
+        bubble('ruby', localAnswer);
+        history.push({ role: 'ruby', text: localAnswer });
+        status.textContent = brain.memory.name ? 'Chatting with ' + brain.memory.name + ' (local brain)' : 'Memory saved in this browser (local brain)';
+        persist();
+        return;
+      }
+      serverAnswer(text).then(function (server) {
+        typing.remove();
+        var answer = server ? server.answer : localAnswer;
         bubble('ruby', answer);
         history.push({ role: 'ruby', text: answer });
-        status.textContent = viaLlm
-          ? 'Answered by Gemini'
+        status.textContent = server
+          ? (server.mode === 'wikipedia' ? 'Answered from Wikipedia (free, no LLM)' : 'Answered by Gemini')
           : (brain.memory.name ? 'Chatting with ' + brain.memory.name + ' (local brain)' : 'Memory saved in this browser (local brain)');
         persist();
       });

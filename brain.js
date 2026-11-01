@@ -15,6 +15,57 @@
     "I would tell you a UDP joke, but you might not get it.",
   ];
 
+  // Ruby's OWN knowledge base — free, no API key, no LLM.
+  // This is the embedded copy of knowledge.json, so the browser works
+  // offline. Edit knowledge.json to add facts, and keep this list in
+  // step with it. Answers here are looked up, not generated.
+  var KNOWLEDGE = [
+    { keywords: ['capital', 'france'], answer: 'The capital of France is Paris.' },
+    { keywords: ['capital', 'england'], answer: 'The capital of the United Kingdom is London.' },
+    { keywords: ['capital', 'united kingdom'], answer: 'The capital of the United Kingdom is London.' },
+    { keywords: ['capital', 'germany'], answer: 'The capital of Germany is Berlin.' },
+    { keywords: ['capital', 'italy'], answer: 'The capital of Italy is Rome.' },
+    { keywords: ['capital', 'spain'], answer: 'The capital of Spain is Madrid.' },
+    { keywords: ['capital', 'japan'], answer: 'The capital of Japan is Tokyo.' },
+    { keywords: ['capital', 'australia'], answer: 'The capital of Australia is Canberra.' },
+    { keywords: ['capital', 'canada'], answer: 'The capital of Canada is Ottawa.' },
+    { keywords: ['capital', 'mexico'], answer: 'The capital of Mexico is Mexico City.' },
+    { keywords: ['capital', 'oklahoma'], answer: 'The capital of Oklahoma is Oklahoma City.' },
+    { keywords: ['capital', 'texas'], answer: 'The capital of Texas is Austin.' },
+    { keywords: ['planet', 'closest', 'sun'], answer: 'Mercury is the planet closest to the Sun.' },
+    { keywords: ['planet', 'largest'], answer: 'Jupiter is the largest planet in our solar system.' },
+    { keywords: ['planet', 'red'], answer: 'Mars is known as the Red Planet.' },
+    { keywords: ['water', 'boil'], answer: 'Water boils at 100°C (212°F) at sea level.' },
+    { keywords: ['water', 'freeze'], answer: 'Water freezes at 0°C (32°F).' },
+    { keywords: ['days', 'week'], answer: 'There are 7 days in a week: Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, and Sunday.' },
+    { keywords: ['months', 'year'], answer: 'There are 12 months in a year: January, February, March, April, May, June, July, August, September, October, November, December.' },
+    { keywords: ['days', 'year'], answer: 'There are 365 days in a normal year, and 366 in a leap year.' },
+    { keywords: ['egg', 'boil'], answer: 'For a hard-boiled egg: put eggs in cold water, bring to a boil, then cover and leave for 9 to 12 minutes, then cool in cold water before peeling.' },
+    { keywords: ['shopping list'], answer: 'To make a shopping list with me, say “add milk to my shopping list”, and I will keep it here. Say “shopping list” to see it.' },
+    { keywords: ['who', 'ruby'], answer: "I'm Ruby, an AI chatbot. I'm warm, direct, and a little playful, I help with small tasks, and I don't pretend to be human." },
+    { keywords: ['alphabet'], answer: 'The English alphabet has 26 letters, from A to Z.' },
+    { keywords: ['rainbow'], answer: 'The colours of the rainbow are red, orange, yellow, green, blue, indigo, and violet.' },
+    { keywords: ['speed', 'light'], answer: 'Light travels at about 299,792 kilometres per second in a vacuum.' },
+    { keywords: ['moon'], answer: "The Moon is Earth's only natural satellite, and it orbits Earth in about 27 days." },
+    { keywords: ['sun', 'star'], answer: 'The Sun is a star at the centre of our solar system.' },
+  ];
+
+  function knowledgeAnswer(input) {
+    var text = lower(input);
+    var best = null;
+    var bestScore = 0;
+    KNOWLEDGE.forEach(function (entry) {
+      var score = 0;
+      entry.keywords.forEach(function (kw) {
+        if (text.indexOf(kw) !== -1) score++;
+      });
+      if (score > bestScore) { bestScore = score; best = entry; }
+    });
+    // Require at least 2 keyword hits, or a single distinctive phrase.
+    if (best && (bestScore >= 2 || best.keywords.length === 1)) return best.answer;
+    return null;
+  }
+
   function clean(s) { return String(s || '').trim(); }
   function lower(s) { return clean(s).toLowerCase(); }
 
@@ -376,6 +427,12 @@
         return 'So far in this chat:\n' + hist.join('\n') + '\n\nWant me to turn any of that into a note or a todo?';
       }
 
+      // Own knowledge base first, before the generic fallback.
+      // This is lookup, not LLM generation — and if it is not in here,
+      // Ruby says so instead of guessing.
+      var known = knowledgeAnswer(raw);
+      if (known) return 'From my own knowledge base: ' + known;
+
       // Fallback: stay helpful, don't invent facts, ask one clear follow-up.
       if (/^(yes|yeah|yep|sure|ok|okay)$/.test(text)) return 'Great — what next? I can save that as a note or a todo if you want.';
       if (/^(no|nope|not really)$/.test(text)) return 'No problem. Tell me what would help instead.';
@@ -385,6 +442,7 @@
     return {
       memory: mem,
       reply: reply,
+      knowledgeAnswer: knowledgeAnswer,
       memorySummary: memorySummary,
       todoListText: todoListText,
       evalArithmetic: evalArithmetic,

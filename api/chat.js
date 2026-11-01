@@ -1,7 +1,8 @@
 // Vercel serverless function: POST /api/chat
-// Uses Gemini when GEMINI_API_KEY is set as a Vercel environment variable.
-// Otherwise it returns an error and the chat page falls back to Ruby's
-// local brain in the browser — the live site never breaks for lack of a key.
+// Order: 1) Wikipedia (free, no key, no LLM) for "what is / who is /
+// tell me about X" questions, 2) Gemini when GEMINI_API_KEY is set,
+// 3) otherwise an error and the chat page falls back to Ruby's local
+// brain in the browser — the live site never breaks for lack of a key.
 //
 // Set the key in Vercel (Project Settings > Environment Variables), never
 // in this file, never in the repo, and never in chat. Use a fresh key:
@@ -35,6 +36,25 @@ module.exports = async function handler(req, res) {
     res.status(400).json({ error: 'Missing message.' });
     return;
   }
+  // Free database first: Wikipedia's summary API needs no key.
+  const wikiMatch = message.trim().match(/^(what is|who is|tell me about|what'?s)\s+(.+?)\??$/i);
+  if (wikiMatch) {
+    try {
+      const title = encodeURIComponent(wikiMatch[2].trim().replace(/\s+/g, '_'));
+      const wikiRes = await fetch('https://en.wikipedia.org/api/rest_v1/page/summary/' + title, {
+        headers: { 'User-Agent': 'RubyChatbot/1.0 (https://ruby-logans-projects-cdea6129.vercel.app/)' },
+        signal: AbortSignal.timeout(15000),
+      });
+      if (wikiRes.ok) {
+        const wiki = await wikiRes.json();
+        if (wiki && wiki.extract) {
+          res.status(200).json({ answer: wiki.extract + ' (Source: Wikipedia)', mode: 'wikipedia' });
+          return;
+        }
+      }
+    } catch (e) { /* fall through to Gemini */ }
+  }
+
   const key = process.env.GEMINI_API_KEY;
   const model = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
   if (!key) {
