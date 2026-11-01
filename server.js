@@ -22,6 +22,28 @@ const fs = require('fs');
 const path = require('path');
 const RubyBrain = require('./brain.js');
 
+// Load a local ".env" file (same folder as server.js) into process.env,
+// without any dependency. Only values not already set in the real
+// environment are filled in, so a shell export still wins. ".env" is
+// gitignored — never commit it, and never put a real key in .env.example.
+(function loadDotEnv() {
+  try {
+    const lines = fs.readFileSync(path.join(__dirname, '.env'), 'utf8').split(/\r?\n/);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eq = trimmed.indexOf('=');
+      if (eq === -1) continue;
+      const key = trimmed.slice(0, eq).trim();
+      let value = trimmed.slice(eq + 1).trim();
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1);
+      }
+      if (key && !(key in process.env)) process.env[key] = value;
+    }
+  } catch (e) { /* no .env file: running with shell env or local mode */ }
+})();
+
 const PORT = process.env.PORT || 3000;
 const brain = RubyBrain.create(RubyBrain.defaultMemory());
 

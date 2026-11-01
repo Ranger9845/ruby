@@ -1,0 +1,4 @@
+# Never commit a real key. This keeps a local .env out of GitHub even
+# if you run git add . in the ruby folder.
+.env
+node_modules/
