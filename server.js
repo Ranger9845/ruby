@@ -23,6 +23,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const RubyBrain = require('./brain.js');
+const { blandCall } = require('./bland.js');
 
 // Load a local ".env" file (same folder as server.js) into process.env,
 // without any dependency. Only values not already set in the real
@@ -137,6 +138,29 @@ async function llmReply(messages) {
 
 const server = http.createServer(async (req, res) => {
   try {
+    // POST /api/call — place a Bland call, with Ruby's AI disclosure forced
+    // by bland.js. This endpoint is NOT wired to the chat page: a call is
+    // only placed when the person running this server deliberately calls
+    // this endpoint, after approving the exact recipient, task, and
+    // callback number. Never call it from a chat message on its own.
+    if (req.method === 'POST' && req.url === '/api/call') {
+      let body = '';
+      req.on('data', (c) => { body += c; });
+      req.on('end', async () => {
+        try {
+          const { phoneNumber, task, onBehalfOf, voice } = JSON.parse(body || '{}');
+          const result = await blandCall({ phoneNumber, task, onBehalfOf, voice });
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ callId: result.callId, taskSpoken: result.taskSpoken, mode: 'bland' }));
+        } catch (e) {
+          const status = /No Bland key/.test(e.message) ? 503 : 400;
+          res.writeHead(status, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: e.message }));
+        }
+      });
+      return;
+    }
+
     if (req.method === 'POST' && req.url === '/api/chat') {
       let body = '';
       req.on('data', (c) => { body += c; });
