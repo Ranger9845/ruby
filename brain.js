@@ -205,7 +205,8 @@
           '• “add milk to my shopping list” / “shopping list”\n' +
           '• “remind me at 4pm to call the shop” / “my reminders”\n' +
           '• “add brush teeth to my morning routine” / “morning routine” / “good morning”\n' +
-          '• “draft a call to the shop about milk” — I draft it with my AI disclosure, I do not dial it myself\n' +
+          '• “draft a call to the shop about milk” — I draft it with my AI disclosure\n' +
+          '• “call +14055551234 about milk” then “yes, call” — temporary chat calling, script shown first\n' +
           '• “note that the shop closes at 9” / “list my notes”\n' +
           '• “what is 12 * 8 + 5?” / “convert 5 miles to km” / “convert 70 f to c” / “what time is it?” / “tell me a joke”\n' +
           '• “when I say good morning, say …” to teach me a reply\n' +

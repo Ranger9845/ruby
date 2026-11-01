@@ -17,6 +17,10 @@
 
   var brain = RubyBrain.create(load(MEMORY_KEY, null) || RubyBrain.defaultMemory());
   var history = load(HISTORY_KEY, []);
+  // Temporary chat-to-call state (2026-11-01, "just for now"):
+  // a pending call is only set from a "call +number about …" message,
+  // and only dialled after the user replies "yes, call" in chat.
+  var pendingCall = null;
   if (!Array.isArray(history)) history = [];
 
   var log = document.getElementById('log');
@@ -75,6 +79,21 @@
     } catch (e) { return null; }
   }
 
+  async function doChatCall(call) {
+    try {
+      var res = await fetch('/api/chat-call', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumber: call.phone, task: call.task, onBehalfOf: brain.memory.name || 'Logan', chatConfirmed: true }),
+      });
+      var data = await res.json();
+      if (!res.ok) return 'Call did not go through: ' + (data.error || 'unknown error') + ' No call was placed unless you saw a call ID.';
+      return 'Calling now. Call ID: ' + (data.callId || 'unknown') + '. Script spoken: "' + data.taskSpoken + '"';
+    } catch (e) {
+      return 'Call did not go through — check your connection and try again.';
+    }
+  }
+
   function send(text) {
     text = (text || '').trim();
     if (!text) return;
@@ -84,6 +103,43 @@
     var typing = bubble('ruby', '…');
     typing.classList.add('typing');
     status.textContent = 'Ruby is thinking…';
+
+    // Chat-to-call, temporary mode: "call +14055551234 about milk"
+    // shows the script first; "yes, call" dials it, "no" cancels it.
+    // Ruby cannot call a shop by name alone — she needs a phone number.
+    var callMatch = text.match(/^call\s+(\+[0-9]{7,15})\s+about\s+(.+)$/i);
+    if (callMatch) {
+      pendingCall = { phone: callMatch[1], task: callMatch[2].trim() };
+      typing.remove();
+      var script = "Hi, I'm Ruby, an AI assistant calling on behalf of " + (brain.memory.name || 'Logan') + '. I have a question about ' + pendingCall.task + ', if you\'re available!';
+      var draft = 'Ready to call ' + pendingCall.phone + ' with this script:\n"' + script + '"\nReply "yes, call" to dial it, or "no" to cancel. I will not dial until you say yes.';
+      bubble('ruby', draft);
+      history.push({ role: 'ruby', text: draft });
+      status.textContent = 'Call ready — waiting for your yes';
+      persist();
+      return;
+    }
+    if (/^yes,? call$/i.test(text) && pendingCall) {
+      var call = pendingCall;
+      pendingCall = null;
+      doChatCall(call).then(function (result) {
+        typing.remove();
+        bubble('ruby', result);
+        history.push({ role: 'ruby', text: result });
+        status.textContent = 'Call attempted';
+        persist();
+      });
+      return;
+    }
+    if (/^(no|cancel|nevermind|never mind)$/i.test(text) && pendingCall) {
+      pendingCall = null;
+      typing.remove();
+      bubble('ruby', 'Cancelled — no call placed.');
+      history.push({ role: 'ruby', text: 'Cancelled — no call placed.' });
+      status.textContent = 'Call cancelled';
+      persist();
+      return;
+    }
 
     // Small delay so the typing indicator is visible, then answer.
     setTimeout(function () {
